@@ -1,0 +1,5 @@
+httpx
+dotenv
+fastapi
+uvicorn
+letta-client
