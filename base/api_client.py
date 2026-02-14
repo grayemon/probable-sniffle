@@ -1,5 +1,5 @@
 import httpx
-import logging
+from utils.logger import setup_logger
 from typing import Any, Dict, Optional
 
 
@@ -20,14 +20,28 @@ class APIClient:
         self.api_key = api_key
         self.auth_header_name = auth_header_name
         self.auth_header_prefix = auth_header_prefix
-        self.logger = logging.getLogger("APIClient")
+        self.logger = setup_logger("APIClient")
 
     def _build_headers(
         self, extra_headers: Optional[Dict[str, str]] = None
     ) -> Dict[str, str]:
         headers = {"Content-Type": "application/json"}
         if self.api_key:
-            headers[self.auth_header_name] = f"{self.auth_header_prefix} {self.api_key}"
+            if self.auth_header_prefix:
+                headers[self.auth_header_name] = (
+                    f"{self.auth_header_prefix} {self.api_key}"
+                )
+            else:
+                headers[self.auth_header_name] = self.api_key
+            # Log auth header for debugging (mask the key for security)
+            masked_key = (
+                self.api_key[:4] + "..." + self.api_key[-4:]
+                if len(self.api_key) > 8
+                else "***"
+            )
+            self.logger.info(f"Auth header: {self.auth_header_name}={masked_key}")
+        else:
+            self.logger.warning("No API key provided!")
         if extra_headers:
             headers.update(extra_headers)
         return headers
@@ -48,13 +62,28 @@ class APIClient:
             return response.json()
 
     async def post(
-        self, endpoint: str, data: Any = None, headers: Optional[Dict[str, str]] = None
+        self,
+        endpoint: str,
+        data: Any = None,
+        headers: Optional[Dict[str, str]] = None,
+        api_key: Optional[str] = None,
     ) -> Any:
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
         self.logger.info(f"POST {url} data={data}")
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                url, json=data, headers=self._build_headers(headers)
-            )
-            response.raise_for_status()
-            return response.json()
+        # Use provided api_key if available, otherwise use default
+        original_api_key = self.api_key
+        if api_key:
+            self.api_key = api_key
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    url, json=data, headers=self._build_headers(headers)
+                )
+                response.raise_for_status()
+                # Handle empty response body
+                if not response.content:
+                    return None
+                return response.json()
+        finally:
+            # Restore original api_key
+            self.api_key = original_api_key

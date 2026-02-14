@@ -156,4 +156,7 @@ $RECYCLE.BIN/
 *.msix
 *.msm
 *.msp
+
+# Letta
+.letta/
 *.lnk

@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 import logging
+import uvicorn
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -24,40 +25,36 @@ async def receive_webhook(request: Request):
     try:
         # Get the raw body
         body = await request.body()
-        
+
         # Try to parse as JSON
         try:
             json_data = await request.json()
             logger.info(f"Received webhook data: {json_data}")
-            
+
             return JSONResponse(
                 status_code=200,
                 content={
                     "status": "success",
                     "message": "Webhook received",
-                    "data": json_data
-                }
+                    "data": json_data,
+                },
             )
         except Exception as e:
             logger.info(f"Received non-JSON webhook: {body.decode('utf-8')}")
-            
+
             return JSONResponse(
                 status_code=200,
                 content={
                     "status": "success",
                     "message": "Webhook received (non-JSON)",
-                    "data": body.decode('utf-8')
-                }
+                    "data": body.decode("utf-8"),
+                },
             )
-            
+
     except Exception as e:
         logger.error(f"Error processing webhook: {str(e)}")
         return JSONResponse(
-            status_code=500,
-            content={
-                "status": "error",
-                "message": str(e)
-            }
+            status_code=500, content={"status": "error", "message": str(e)}
         )
 
 
@@ -66,5 +63,9 @@ async def health_check():
     """Health check endpoint"""
     return {"status": "healthy"}
 
+
 # Run the app
 # uvicorn tests.simple_webhook_app:app --reload --port 8000
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="127.0.0.1", port=8111)
