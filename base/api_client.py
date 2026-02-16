@@ -15,11 +15,13 @@ class APIClient:
         api_key: Optional[str] = None,
         auth_header_name: str = "X-API-Key",
         auth_header_prefix: Optional[str] = None,
+        timeout: float = 30.0,
     ):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.auth_header_name = auth_header_name
         self.auth_header_prefix = auth_header_prefix
+        self.timeout = timeout
         self.logger = setup_logger("APIClient")
 
     def _build_headers(
@@ -54,7 +56,7 @@ class APIClient:
     ) -> Any:
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
         self.logger.info(f"GET {url} params={params}")
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.get(
                 url, params=params, headers=self._build_headers(headers)
             )
@@ -65,19 +67,20 @@ class APIClient:
         self,
         endpoint: str,
         data: Any = None,
+        params: Optional[Dict[str, Any]] = None,
         headers: Optional[Dict[str, str]] = None,
         api_key: Optional[str] = None,
     ) -> Any:
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
-        self.logger.info(f"POST {url} data={data}")
+        self.logger.info(f"POST {url} params={params} data={data}")
         # Use provided api_key if available, otherwise use default
         original_api_key = self.api_key
         if api_key:
             self.api_key = api_key
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(
-                    url, json=data, headers=self._build_headers(headers)
+                    url, params=params, json=data, headers=self._build_headers(headers)
                 )
                 response.raise_for_status()
                 # Handle empty response body
