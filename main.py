@@ -6,15 +6,9 @@ from services.handlers import event_handler
 from config.settings import settings
 from utils.logger import setup_logger
 import uvicorn
-import logging
 
 # Configure logging
 logger = setup_logger(__name__)
-
-# Add file handler for troubleshooting
-file_handler = logging.FileHandler('main_app.log')
-file_handler.setLevel(logging.INFO)
-logger.addHandler(file_handler)
 
 # Create FastAPI app
 logger.info(f"Starting Chatwoot Webhook Receiver on port {settings.webhook_port}")
@@ -53,20 +47,18 @@ async def receive_webhook(request: Request):
             try:
                 webhook_data = WebhookEventAdapter.validate_python(json_data)
                 logger.info(f"Validated webhook: {webhook_data.event}")
-
                 # Route to event handler
                 result = await event_handler(webhook_data)
 
                 return JSONResponse(status_code=200, content=result)
             except ValidationError as e:
                 logger.error(f"Validation error: {e}")
-                # TODO: Improve error handling - add more specific error messages
                 return JSONResponse(
                     status_code=400, content={"status": "error", "message": str(e)}
                 )
 
-        except Exception as e:
-            logger.info(f"Received non-JSON webhook")
+        except Exception:
+            logger.info("Received non-JSON webhook")
             return JSONResponse(
                 status_code=200,
                 content={"status": "success", "message": "Webhook received (non-JSON)"},
@@ -74,7 +66,6 @@ async def receive_webhook(request: Request):
 
     except Exception as e:
         logger.error(f"Error processing webhook: {str(e)}")
-        # TODO: Improve error handling - add retry logic, better logging
         return JSONResponse(
             status_code=500, content={"status": "error", "message": str(e)}
         )
@@ -89,4 +80,5 @@ async def health_check():
 
 # Run app
 if __name__ == "__main__":
+    logger.info(f"Starting Chatwoot Webhook Receiver on port {settings.webhook_port}")
     uvicorn.run("main:app", host="127.0.0.1", port=settings.webhook_port, reload=True)

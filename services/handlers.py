@@ -100,9 +100,7 @@ async def handle_message_created(data: MessageCreated):
 
         # Send message to Letta
         logger.info(f"Sending message to Letta conversation {letta_conversation_id}")
-        response = await letta_service.send_message(
-            letta_conversation_id, data.content
-        )
+        response = await letta_service.send_message(letta_conversation_id, data.content)
 
         if response:
             # Send Letta response back to Chatwoot
@@ -110,7 +108,9 @@ async def handle_message_created(data: MessageCreated):
                 account_id=account_id, conversation_id=conversation_id
             )
             await chatwoot_service.send_message(params, response)
-            logger.info(f"Sent Letta response to Chatwoot conversation {conversation_id}")
+            logger.info(
+                f"Sent Letta response to Chatwoot conversation {conversation_id}"
+            )
         else:
             logger.warning("No response from Letta")
 

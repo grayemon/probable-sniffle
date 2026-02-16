@@ -1,5 +1,5 @@
 from pathlib import Path
-from fastapi import FastAPI, Request, Body
+from fastapi import FastAPI, Request
 from pydantic import BaseModel
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles

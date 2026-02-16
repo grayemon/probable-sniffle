@@ -1,0 +1,17 @@
+{
+  "account": {
+    "id": 1,
+    "name": "Famiglia Land Realty"
+  },
+  "additional_attributes": {},
+  "avatar": "",
+  "custom_attributes": {},
+  "email": null,
+  "id": 6,
+  "identifier": null,
+  "name": "morning-rain-190",
+  "phone_number": null,
+  "thumbnail": "",
+  "blocked": false,
+  "event": "contact_created"
+}

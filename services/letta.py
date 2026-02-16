@@ -1,4 +1,4 @@
-from letta_client import AsyncLetta, APIError
+from base.api_client import APIClient
 from config.settings import settings
 from utils.logger import setup_logger
 from typing import Optional
@@ -7,12 +7,15 @@ logger = setup_logger(__name__)
 
 
 class LettaService:
-    """Service for interacting with Letta API"""
+    """Service for interacting with Letta API via direct HTTP calls."""
 
     def __init__(self):
-        self.client = AsyncLetta(
-            api_key=settings.letta_api_key,
+        self.client = APIClient(
             base_url=settings.letta_base_url,
+            api_key=settings.letta_api_key,
+            auth_header_name="Authorization",
+            auth_header_prefix="Bearer",
+            timeout=60.0,  # Letta API can be slow
         )
         self.agent_id = settings.letta_agent_id
 
@@ -24,16 +27,15 @@ class LettaService:
             Conversation ID or None if failed
         """
         try:
-            conversation = await self.client.conversations.create(
-                agent_id=self.agent_id
+            response = await self.client.post(
+                "/v1/conversations",
+                params={"agent_id": self.agent_id},
             )
-            logger.info(f"Created Letta conversation: {conversation.id}")
-            return conversation.id
-        except APIError as e:
-            logger.error(f"Failed to create Letta conversation: {e}")
-            return None
+            conversation_id = response.get("id")
+            logger.info(f"Created Letta conversation: {conversation_id}")
+            return conversation_id
         except Exception as e:
-            logger.error(f"Unexpected error creating Letta conversation: {e}")
+            logger.error(f"Failed to create Letta conversation: {type(e).__name__}: {e}")
             return None
 
     async def send_message(
@@ -50,57 +52,39 @@ class LettaService:
             Assistant response text or None if failed
         """
         try:
-            # Send message to conversation (non-streaming)
-            response = await self.client.conversations.messages.create(
-                conversation_id=conversation_id,
-                messages=[{"role": "user", "content": message}],
-                streaming=False,
+            response = await self.client.post(
+                f"/v1/conversations/{conversation_id}/messages",
+                data={
+                    "messages": [{"role": "user", "content": message}],
+                    "streaming": False,
+                },
             )
 
-            logger.info(f"Letta response type: {type(response)}")
-
-            # Extract assistant message content
             response_text = self._extract_response_text(response)
             return response_text
 
-        except APIError as e:
-            logger.error(f"Letta API error: {e}")
-            return None
         except Exception as e:
-            logger.error(f"Unexpected error sending message to Letta: {e}")
+            logger.error(f"Failed to send message to Letta: {type(e).__name__}: {e}")
             return None
 
-    def _extract_response_text(self, response) -> Optional[str]:
+    def _extract_response_text(self, data: dict) -> Optional[str]:
         """
-        Extract assistant message text from Letta response.
+        Extract assistant message text from Letta response JSON.
 
         Args:
-            response: Letta API response
+            data: Parsed JSON response from Letta API
 
         Returns:
             Assistant message content or None if not found
         """
         try:
-            logger.info(f"Letta response type: {type(response)}")
-            logger.info(f"Letta response attributes: {dir(response)}")
-
-            # Response contains messages array with different types
-            if hasattr(response, "messages") and response.messages:
-                logger.info(f"Response has {len(response.messages)} messages")
-                for i, message in enumerate(response.messages):
-                    logger.info(f"Message {i}: type={type(message)}, attrs={dir(message)}")
-                    # Check for assistant_message type
-                    if hasattr(message, "message_type"):
-                        logger.info(f"Message {i} message_type: {message.message_type}")
-                        if message.message_type == "assistant_message":
-                            if hasattr(message, "content") and message.content:
-                                logger.info(f"Found assistant message: {message.content}")
-                                return message.content
-
-            # Fallback: try to get content directly
-            if hasattr(response, "content"):
-                logger.info(f"Using fallback content: {response.content}")
-                return response.content
+            messages = data.get("messages", [])
+            for message in messages:
+                if message.get("message_type") == "assistant_message":
+                    content = message.get("content")
+                    if content:
+                        logger.info(f"Extracted assistant message: {content[:100]}...")
+                        return content
 
             logger.warning("No assistant message found in Letta response")
             return None

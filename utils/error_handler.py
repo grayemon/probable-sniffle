@@ -1,6 +1,5 @@
 from utils.logger import setup_logger
-from typing import Callable, Any, Optional
-import logging
+from typing import Callable, Any
 
 logger = setup_logger(__name__)
 

@@ -2,9 +2,6 @@ import asyncio
 from services.chatwoot import chatwoot_service
 from base.models import (
     ConversationParams,
-    ConversationStatus,
-    ConversationPriority,
-    ConversationCustomAttributes,
 )
 
 

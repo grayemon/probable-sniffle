@@ -11,18 +11,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import httpx
 import json
-import asyncio
 import subprocess
 import time
 from base.models import (
     WebhookEventAdapter,
-    ContactCreated,
     WebwidgetTriggered,
     MessageCreated,
-    ConversationCreated,
-    MessageUpdated,
-    ContactUpdated,
-    ConversationUpdated,
 )
 
 BASE_URL = "http://127.0.0.1:8112"
