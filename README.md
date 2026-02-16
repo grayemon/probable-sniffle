@@ -146,6 +146,7 @@ python -m tests.webhook_tester
 - **Pydantic v2** - Data validation
 - **httpx** - HTTP client
 - **uv** - Package manager
+- **pytest** - Testing framework (dev)
 
 ---
 
@@ -166,10 +167,12 @@ Replaced the letta-client SDK with direct httpx calls due to SDK bug (ignores `s
 - [x] Cleaned up tests folder (removed 11 outdated files)
 - [x] Refactored logging to use centralized config from .env
 - [x] Migrated from requirements.txt to pyproject.toml
+- [x] Added unit tests for handlers (17 tests)
 
 **Commits:**
 - `939185f` feat: Replace letta-client SDK with direct httpx calls, add APIClient improvements, and cleanup tests
 - `6dfb9c5` docs: Update letta_memory_export.json with current project state
+- `c242969` test: Add unit tests for services/handlers.py
 
 ---
 
@@ -199,5 +202,5 @@ Implemented event routing and handler extraction.
 - [ ] Improve error messages
 
 **Priority 3: Testing**
-- [ ] Add unit tests for handlers
+- [x] Add unit tests for handlers
 - [ ] Add integration tests for full flow
