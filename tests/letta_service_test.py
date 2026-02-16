@@ -1,4 +1,5 @@
 """Test the LettaService class (using direct httpx)."""
+
 import asyncio
 from services.letta import letta_service
 from utils.logger import setup_logger
@@ -14,8 +15,7 @@ async def test_service():
     logger.info("Testing LettaService.send_message...")
 
     response = await letta_service.send_message(
-        conversation_id=conversation_id,
-        message="Hello from the direct httpx test!"
+        conversation_id=conversation_id, message="Hello from the direct httpx test!"
     )
 
     if response:

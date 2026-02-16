@@ -1,4 +1,5 @@
 """Test creating a Letta conversation (using direct httpx)."""
+
 import asyncio
 from services.letta import letta_service
 from utils.logger import setup_logger

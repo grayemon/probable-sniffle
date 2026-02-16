@@ -35,12 +35,12 @@ class LettaService:
             logger.info(f"Created Letta conversation: {conversation_id}")
             return conversation_id
         except Exception as e:
-            logger.error(f"Failed to create Letta conversation: {type(e).__name__}: {e}")
+            logger.error(
+                f"Failed to create Letta conversation: {type(e).__name__}: {e}"
+            )
             return None
 
-    async def send_message(
-        self, conversation_id: str, message: str
-    ) -> Optional[str]:
+    async def send_message(self, conversation_id: str, message: str) -> Optional[str]:
         """
         Send a message to a Letta conversation and extract response text.
 
