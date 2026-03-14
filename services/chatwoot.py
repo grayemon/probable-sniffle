@@ -66,18 +66,45 @@ class ChatwootService:
         return response
 
     # send message
-    async def send_message(self, params: ConversationParams, message: str):
+    async def send_message(
+        self,
+        params: ConversationParams,
+        message: str,
+        content_type: str = "text",
+        content_attributes: dict = None,
+    ):
+        """
+        Send a message to a Chatwoot conversation.
+
+        Args:
+            params: Conversation parameters (account_id, conversation_id)
+            message: Message content
+            content_type: Message type - "text", "input_select", "form", "cards", "article"
+            content_attributes: Additional attributes for interactive messages
+
+        Returns:
+            API response or None
+        """
         self.logger.info(
             f"sending message to conversation {params.conversation_id} in account {params.account_id}"
         )
         # post {base_url}/api/v1/accounts/{account_id}/conversations/{conversation_id}/messages
         endpoint = f"/api/v1/accounts/{params.account_id}/conversations/{params.conversation_id}/messages"
+
+        payload = {
+            "content": message,
+            "content_type": content_type,
+            "private": False,
+        }
+        if content_attributes:
+            payload["content_attributes"] = content_attributes
+
         # Try agent bot API key first, fallback to user API key on 401 error
         try:
             response = await self.client.post(
                 endpoint,
                 api_key=settings.chatwoot_agent_bot_api_key,
-                data={"content": message},
+                data=payload,
             )
         except Exception as e:
             if "401" in str(e):
@@ -87,7 +114,7 @@ class ChatwootService:
                 response = await self.client.post(
                     endpoint,
                     api_key=settings.chatwoot_user_api_key,
-                    data={"content": message},
+                    data=payload,
                 )
             else:
                 raise

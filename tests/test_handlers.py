@@ -27,8 +27,23 @@ from services.handlers import (
 def mock_letta_service():
     """Mock Letta service"""
     with patch("services.handlers.letta_service") as mock:
+        mock.create_agent = AsyncMock(return_value="agent-test-123")
         mock.create_conversation = AsyncMock(return_value="conv-test-123")
-        mock.send_message = AsyncMock(return_value="AI response message")
+        mock.send_message = AsyncMock(
+            return_value={
+                "messages": [
+                    {
+                        "message_type": "approval_request_message",
+                        "tool_call": {
+                            "name": "send_chatwoot_message",
+                            "tool_call_id": "tc-123",
+                            "arguments": '{"content": "AI response", "content_type": "text"}',
+                        },
+                    }
+                ]
+            }
+        )
+        mock.send_tool_result = AsyncMock(return_value={"messages": []})
         yield mock
 
 
@@ -197,20 +212,25 @@ async def test_handle_message_created_with_existing_letta_conversation(
     """Test handling when Letta conversation already exists"""
     data = create_message_created(
         message_type="incoming",
-        custom_attributes={"letta_conversation_id": "conv-existing-123"},
+        custom_attributes={
+            "letta_agent_id": "agent-existing-123",
+            "letta_conversation_id": "conv-existing-123",
+        },
     )
 
     result = await handle_message_created(data)
 
     assert result["status"] == "success"
-    # Should NOT create new conversation
+    # Should NOT create new agent or conversation
+    mock_letta_service.create_agent.assert_not_called()
     mock_letta_service.create_conversation.assert_not_called()
     # Should send message to existing conversation
     mock_letta_service.send_message.assert_called_once_with(
         "conv-existing-123", "Hello"
     )
-    # Should send response to Chatwoot
+    # Should handle approval request and send to Chatwoot
     mock_chatwoot_service.send_message.assert_called_once()
+    mock_letta_service.send_tool_result.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -220,24 +240,48 @@ async def test_handle_message_created_creates_new_letta_conversation(
     """Test handling when new Letta conversation needs to be created"""
     data = create_message_created(
         message_type="incoming",
-        custom_attributes={},  # No existing Letta conversation
+        custom_attributes={},  # No existing Letta agent or conversation
     )
 
     result = await handle_message_created(data)
 
     assert result["status"] == "success"
-    # Should create new conversation
+    # Should create new agent and conversation
+    mock_letta_service.create_agent.assert_called_once()
     mock_letta_service.create_conversation.assert_called_once()
-    # Should update Chatwoot custom attributes
-    mock_chatwoot_service.update_custom_attributes.assert_called_once()
+    # Should update Chatwoot custom attributes (twice: agent + conversation)
+    assert mock_chatwoot_service.update_custom_attributes.call_count == 2
     # Should send message to Letta
     mock_letta_service.send_message.assert_called_once()
-    # Should send response to Chatwoot
+    # Should handle approval request and send to Chatwoot
     mock_chatwoot_service.send_message.assert_called_once()
+    mock_letta_service.send_tool_result.assert_called_once()
 
 
 @pytest.mark.asyncio
-async def test_handle_message_created_letta_creation_fails(
+async def test_handle_message_created_letta_agent_creation_fails(
+    mock_letta_service, mock_chatwoot_service
+):
+    """Test handling when Letta agent creation fails"""
+    mock_letta_service.create_agent.return_value = None
+
+    data = create_message_created(
+        message_type="incoming",
+        custom_attributes={},
+    )
+
+    result = await handle_message_created(data)
+
+    assert result["status"] == "success"
+    assert "Letta agent creation failed" in result["message"]
+    # Should not send message or update attributes
+    mock_letta_service.send_message.assert_not_called()
+    mock_chatwoot_service.update_custom_attributes.assert_not_called()
+    mock_chatwoot_service.send_message.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_handle_message_created_letta_conversation_creation_fails(
     mock_letta_service, mock_chatwoot_service
 ):
     """Test handling when Letta conversation creation fails"""
@@ -251,10 +295,12 @@ async def test_handle_message_created_letta_creation_fails(
     result = await handle_message_created(data)
 
     assert result["status"] == "success"
-    assert "Letta creation failed" in result["message"]
-    # Should not send message or update attributes
+    assert "Letta conversation creation failed" in result["message"]
+    # Should have created agent and updated attributes once
+    mock_letta_service.create_agent.assert_called_once()
+    assert mock_chatwoot_service.update_custom_attributes.call_count == 1
+    # Should not send message
     mock_letta_service.send_message.assert_not_called()
-    mock_chatwoot_service.update_custom_attributes.assert_not_called()
     mock_chatwoot_service.send_message.assert_not_called()
 
 
@@ -267,7 +313,10 @@ async def test_handle_message_created_letta_no_response(
 
     data = create_message_created(
         message_type="incoming",
-        custom_attributes={"letta_conversation_id": "conv-test-123"},
+        custom_attributes={
+            "letta_agent_id": "agent-test-123",
+            "letta_conversation_id": "conv-test-123",
+        },
     )
 
     result = await handle_message_created(data)
@@ -275,6 +324,7 @@ async def test_handle_message_created_letta_no_response(
     assert result["status"] == "success"
     # Should not send message to Chatwoot when Letta has no response
     mock_chatwoot_service.send_message.assert_not_called()
+    mock_letta_service.send_tool_result.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -284,7 +334,10 @@ async def test_handle_message_created_with_conversation_object(
     """Test handling when conversation is a Conversation object"""
     conversation = Conversation(
         id=5,
-        custom_attributes={"letta_conversation_id": "conv-obj-123"},
+        custom_attributes={
+            "letta_agent_id": "agent-obj-123",
+            "letta_conversation_id": "conv-obj-123",
+        },
     )
     data = create_message_created(
         message_type="incoming",
@@ -297,6 +350,9 @@ async def test_handle_message_created_with_conversation_object(
     mock_letta_service.send_message.assert_called_once_with(
         "conv-obj-123", "Hello"
     )
+    # Should handle approval request
+    mock_chatwoot_service.send_message.assert_called_once()
+    mock_letta_service.send_tool_result.assert_called_once()
 
 
 # Tests for handle_message_updated

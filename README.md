@@ -9,32 +9,42 @@ This application receives webhooks from Chatwoot, forwards customer messages to 
 ## Features
 
 - FastAPI webhook receiver for Chatwoot events
-- Letta AI integration for intelligent responses
-- Conversation state management (stores Letta conversation IDs in Chatwoot)
+- Letta AI integration with client-side tool execution
+- Dynamic agent creation (one Letta agent per Chatwoot conversation)
+- Interactive message support (options, forms, cards, articles)
+- Conversation state management (stores Letta IDs in Chatwoot)
 - Support for multiple Chatwoot event types
 - Comprehensive error handling and logging
 
 ## Architecture
 
-```
-Chatwoot --webhook--> FastAPI App --message--> Letta AI
-    ^                                          |
-    |__________response________________________|
+```text
+Chatwoot --webhook--> Webapp --API--> Letta Agent
+                         ^                   |
+                         |        approval_request_message
+                         +---execute tool----+
+                         |                   |
+                         +---send result---->+
+                                             v
+                                    Chatwoot API (reply)
 ```
 
 ### Flow
+
 1. Chatwoot sends webhook to FastAPI app
 2. Webhook validated via Pydantic discriminated unions
 3. Event routed to appropriate handler
 4. For incoming messages:
+   - Create or retrieve Letta agent (one per Chatwoot conversation)
    - Create or retrieve Letta conversation
    - Send message to Letta
-   - Extract assistant response
-   - Send response back to Chatwoot
+   - Agent calls `send_chatwoot_message` tool (client-side execution)
+   - Webapp executes tool locally (sends to Chatwoot)
+   - Result sent back to agent
 
 ### Project Structure
 
-```
+```text
 probable-sniffle/
 ├── main.py               # FastAPI entry point
 ├── config/settings.py    # Pydantic settings from .env
@@ -85,7 +95,11 @@ Create a `.env` file with the following variables:
 # Letta Configuration
 LETTA_API_KEY=your_letta_api_key
 LETTA_BASE_URL=https://api.letta.com
-LETTA_AGENT_ID=your_agent_id
+
+# Optional: Override defaults for agent creation
+# LETTA_MODEL=anthropic/claude-sonnet-4-5-20250929
+# LETTA_EMBEDDING=openai/text-embedding-3-small
+# LETTA_AGENT_PERSONA=I am a customer support assistant...
 
 # Chatwoot Configuration
 CHATWOOT_AGENT_BOT_API_KEY=your_bot_api_key
@@ -100,6 +114,8 @@ WEBHOOK_ENDPOINT=webhook
 LOG_LEVEL=INFO
 LOG_FILE=logs/chatwoot-letta.log
 ```
+
+> **Note:** Agents are created dynamically per Chatwoot conversation. You don't need to specify `LETTA_AGENT_ID`.
 
 ### Running
 
@@ -139,6 +155,20 @@ python -m tests.webhook_tester
 | contact_updated | Acknowledged |
 | conversation_created | Acknowledged |
 | conversation_updated | Acknowledged |
+
+### Interactive Messages
+
+The Letta agent can send interactive message types to Chatwoot:
+
+| Type | Description |
+|------|-------------|
+| `text` | Simple text response |
+| `input_select` | Options menu with selectable items |
+| `form` | Data collection form with fields |
+| `cards` | Product cards with media and actions |
+| `article` | Knowledge base articles |
+
+See [Chatwoot Interactive Messages](https://www.chatwoot.com/hc/user-guide/articles/1677689344-how-to-use-interactive-messages) for payload examples.
 
 ## Tech Stack
 
